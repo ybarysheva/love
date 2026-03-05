@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>lil cat</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ---- PAGE ---- */
+    body {
+      min-height: 100vh;
+      background: #D4C5A9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    /* vignette */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.40) 100%);
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    .stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      user-select: none;
+    }
+
+    /* ---- BUBBLE ---- */
+    .bubble-area {
+      height: 160px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      overflow: visible;
+      padding-bottom: 6px;
+    }
+
+    .bubble {
+      background: #D4C5A9;
+      border: 3px solid #1C1410;
+      border-radius: 4px;
+      padding: 14px 18px;
+      max-width: 300px;
+      width: max-content;
+      font-size: 0.88rem;
+      line-height: 1.65;
+      color: #1C1410;
+      font-family: 'Courier New', Courier, monospace;
+      filter: drop-shadow(3px 3px 0 #1C1410);
+      text-align: center;
+      position: relative;
+      transform-origin: bottom center;
+      transform: scale(0);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -17px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 10px solid transparent;
+      border-right: 10px solid transparent;
+      border-top: 14px solid #1C1410;
+    }
+    .bubble::before {
+      content: '';
+      position: absolute;
+      bottom: -11px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 7px solid transparent;
+      border-right: 7px solid transparent;
+      border-top: 10px solid #D4C5A9;
+      z-index: 1;
+    }
+
+    .bubble.show {
+      animation: bubblePop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      pointer-events: auto;
+    }
+    .bubble.hide {
+      animation: bubbleHide 0.2s ease-in forwards;
+    }
+
+    @keyframes bubblePop {
+      from { transform: scale(0); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+    @keyframes bubbleHide {
+      from { transform: scale(1); opacity: 1; }
+      to   { transform: scale(0.85); opacity: 0; }
+    }
+
+    /* ---- CAT WRAPPERS ---- */
+    .cat-float { animation: float 2.8s ease-in-out infinite; }
+
+    .cat-squish { transform-origin: center bottom; cursor: pointer; }
+    .cat-squish.squishing { animation: squish 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-12px); }
+    }
+    @keyframes squish {
+      0%   { transform: scaleX(1)    scaleY(1);    }
+      20%  { transform: scaleX(1.28) scaleY(0.72); }
+      55%  { transform: scaleX(0.88) scaleY(1.14); }
+      78%  { transform: scaleX(1.06) scaleY(0.96); }
+      100% { transform: scaleX(1)    scaleY(1);    }
+    }
+
+    /* ---- IDLE ANIMATIONS ---- */
+    @keyframes blink {
+      0%, 92%, 100% { transform: scaleY(1); }
+      95%            { transform: scaleY(0.07); }
+    }
+    @keyframes earTwitch {
+      0%, 88%, 100% { transform: rotate(6deg); }
+      91%           { transform: rotate(-9deg); }
+      95%           { transform: rotate(14deg); }
+      98%           { transform: rotate(4deg); }
+    }
+    @keyframes tailTipSway {
+      0%, 100% { transform: rotate(0deg); }
+      30%      { transform: rotate(7deg); }
+      70%      { transform: rotate(-5deg); }
+    }
+
+    /* ---- LABEL ---- */
+    .cat-label {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.82rem;
+      color: #1C1410;
+      letter-spacing: 0.06em;
+      margin-top: 14px;
+      text-align: center;
+      opacity: 0.7;
+    }
+
+    /* ================================================================
+       DITHER PATTERN HELPERS
+       ink = %231C1410   paper = %23D4C5A9
+       All bg patterns tile at 4×4 px (2 px per dither cell)
+       ================================================================ */
+    /* 75% dark: 3 ink / 1 paper (top-right cell = paper) */
+    .d75 {
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%231C1410'/><rect x='2' y='0' width='2' height='2' fill='%23D4C5A9'/></svg>");
+      background-size: 4px 4px;
+    }
+    /* 50% mid: checkerboard */
+    .d50 {
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%23D4C5A9'/><rect x='0' y='0' width='2' height='2' fill='%231C1410'/><rect x='2' y='2' width='2' height='2' fill='%231C1410'/></svg>");
+      background-size: 4px 4px;
+    }
+    /* 25% light: 1 ink / 3 paper (bottom-right cell = ink) */
+    .d25 {
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%23D4C5A9'/><rect x='2' y='2' width='2' height='2' fill='%231C1410'/></svg>");
+      background-size: 4px 4px;
+    }
+
+    /* ================================================================
+       CSS-ART CAT — Obra Dinn ink + paper palette
+       ================================================================ */
+    .css-cat {
+      position: relative;
+      width: 300px;
+      height: 340px;
+    }
+
+    /* ---------- CLOUD (25% light) ---------- */
+    .cat-cloud {
+      position: absolute;
+      bottom: 0;
+      left: 6px;
+      width: 288px;
+      height: 82px;
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%23D4C5A9'/><rect x='2' y='2' width='2' height='2' fill='%231C1410'/></svg>");
+      background-size: 4px 4px;
+      border-radius: 46% 46% 0 0 / 64% 64% 0 0;
+      z-index: 5;
+    }
+    .cat-cloud::after {
+      content: '';
+      position: absolute;
+      bottom: -13px;
+      left: 0; right: 0;
+      height: 26px;
+      background:
+        radial-gradient(circle, #D4C5A9 47%, #1C1410 48%, #1C1410 52%, transparent 53%)
+        0 0 / 26px 26px repeat-x;
+    }
+
+    /* ---------- TAIL (75% dark) ---------- */
+    .cat-tail {
+      position: absolute;
+      top: 183px;
+      left: 219px;
+      width: 22px;
+      height: 86px;
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%231C1410'/><rect x='2' y='0' width='2' height='2' fill='%23D4C5A9'/></svg>");
+      background-size: 4px 4px;
+      border-radius: 11px;
+      transform: rotate(17deg);
+      transform-origin: top center;
+      z-index: 8;
+    }
+    #tail-tip-g {
+      position: absolute;
+      bottom: -22px;
+      left: -10px;
+      width: 42px;
+      height: 28px;
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%231C1410'/><rect x='2' y='0' width='2' height='2' fill='%23D4C5A9'/></svg>");
+      background-size: 4px 4px;
+      border-radius: 54% 46% 46% 54% / 58% 58% 42% 42%;
+      transform-origin: center top;
+      animation: tailTipSway 3.2s ease-in-out infinite;
+    }
+
+    /* ---------- BODY (75% dark, loaf) ---------- */
+    .cat-body {
+      position: absolute;
+      top: 162px;
+      left: 64px;
+      width: 172px;
+      height: 104px;
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%231C1410'/><rect x='2' y='0' width='2' height='2' fill='%23D4C5A9'/></svg>");
+      background-size: 4px 4px;
+      border-radius: 50% 50% 50% 50% / 56% 56% 44% 44%;
+      z-index: 10;
+      overflow: hidden;
+    }
+    .cat-stripe {
+      position: absolute;
+      width: 5px;
+      background: #1C1410;
+      border-radius: 3px;
+    }
+    .cat-stripe--1 { top: 10px; left: 20px;  height: 46px; transform: rotate(-16deg); }
+    .cat-stripe--2 { top: 8px;  left: 40px;  height: 40px; transform: rotate(-8deg);  }
+    .cat-stripe--3 { top: 10px; right: 20px; height: 46px; transform: rotate(16deg);  }
+    .cat-stripe--4 { top: 8px;  right: 40px; height: 40px; transform: rotate(8deg);   }
+    .cat-belly {
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 86px;
+      height: 44px;
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%23D4C5A9'/><rect x='2' y='2' width='2' height='2' fill='%231C1410'/></svg>");
+      background-size: 4px 4px;
+      border-radius: 50%;
+    }
+
+    /* ---------- PAWS (75% dark) ---------- */
+    .cat-paw {
+      position: absolute;
+      top: 262px;
+      width: 50px;
+      height: 22px;
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%231C1410'/><rect x='2' y='0' width='2' height='2' fill='%23D4C5A9'/></svg>");
+      background-size: 4px 4px;
+      border-radius: 50% 50% 46% 54% / 52% 52% 48% 48%;
+      z-index: 15;
+    }
+    .cat-paw--l { left: 76px;  }
+    .cat-paw--r { right: 76px; }
+    .cat-paw::before {
+      content: '';
+      position: absolute;
+      top: 18%; left: 34%;
+      width: 1.5px; height: 66%;
+      background: #D4C5A9;
+      border-radius: 1px;
+      opacity: 0.55;
+      box-shadow: 9px 0 0 #D4C5A9;
+    }
+
+    /* ---------- FACE GROUP — wraps ears + head for tilt animation ---------- */
+    .cat-face-group {
+      position: absolute;
+      inset: 0;
+      z-index: 17;
+      transform-origin: 50% 60%; /* pivot near neck */
+    }
+
+    /* Mouth snaps open to catch the treat */
+    @keyframes mouthOpen {
+      0%   { transform: translateX(-50%) scaleY(1)   scaleX(1);    }
+      22%  { transform: translateX(-50%) scaleY(3.2) scaleX(1.55); }
+      55%  { transform: translateX(-50%) scaleY(2.8) scaleX(1.35); }
+      82%  { transform: translateX(-50%) scaleY(1.2) scaleX(1.05); }
+      100% { transform: translateX(-50%) scaleY(1)   scaleX(1);    }
+    }
+    .cat-mouth.open {
+      transform-origin: 50% 0%;
+      animation: mouthOpen 0.65s ease-out forwards;
+    }
+
+    /* ---------- EARS (75% dark, no outline) ---------- */
+    .cat-ear {
+      position: absolute;
+      top: 22px;
+      width: 42px;
+      height: 52px;
+      z-index: 18;
+    }
+    .cat-ear::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%231C1410'/><rect x='2' y='0' width='2' height='2' fill='%23D4C5A9'/></svg>");
+      background-size: 4px 4px;
+      clip-path: polygon(50% 0%, 4% 100%, 96% 100%);
+    }
+    .cat-ear-inner {
+      position: absolute;
+      top: 30%; left: 24%; right: 24%; bottom: 6px;
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%23D4C5A9'/><rect x='0' y='0' width='2' height='2' fill='%231C1410'/><rect x='2' y='2' width='2' height='2' fill='%231C1410'/></svg>");
+      background-size: 4px 4px;
+      clip-path: polygon(50% 0%, 10% 100%, 90% 100%);
+      z-index: 2;
+    }
+    .cat-ear--l {
+      left: 91px;
+      transform: rotate(-8deg);
+      transform-origin: bottom center;
+    }
+    .cat-ear--r {
+      left: 165px;
+      transform-origin: bottom center;
+      animation: earTwitch 5.8s ease-in-out infinite;
+    }
+
+    /* ---------- HEAD (75% dark) ---------- */
+    .cat-head {
+      position: absolute;
+      top: 54px; left: 92px;
+      width: 116px; height: 112px;
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%231C1410'/><rect x='2' y='0' width='2' height='2' fill='%23D4C5A9'/></svg>");
+      background-size: 4px 4px;
+      border-radius: 50%;
+      z-index: 20;
+      overflow: visible;
+    }
+
+    /* forehead stripes — solid ink */
+    .cat-head-stripe {
+      position: absolute;
+      background: #1C1410;
+      border-radius: 2px;
+      width: 4px;
+    }
+    .cat-head-stripe--c { top: 5px;  left: 56px;  height: 26px; }
+    .cat-head-stripe--l { top: 8px;  left: 35px;  height: 20px; width: 3px; transform: rotate(-5deg); }
+    .cat-head-stripe--r { top: 8px;  right: 35px; height: 20px; width: 3px; transform: rotate(5deg);  }
+
+    /* blush — 25% light */
+    .cat-blush {
+      position: absolute;
+      top: 63px;
+      width: 28px; height: 14px;
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%23D4C5A9'/><rect x='2' y='2' width='2' height='2' fill='%231C1410'/></svg>");
+      background-size: 4px 4px;
+      border-radius: 50%;
+    }
+    .cat-blush--l { left: 5px;  }
+    .cat-blush--r { right: 5px; }
+
+    /* EYE BACKGROUND RINGS — paper circles behind ink eyes for contrast */
+    .cat-eye-bg {
+      position: absolute;
+      top: 35px;
+      width: 22px; height: 22px;
+      background: #D4C5A9;
+      border-radius: 50%;
+    }
+    .cat-eye-bg--l { left: 16px;  }
+    .cat-eye-bg--r { right: 16px; }
+
+    /* EYES — solid ink */
+    #eye-l-g, #eye-r-g {
+      position: absolute;
+      top: 39px;
+      width: 14px; height: 14px;
+      background: #1C1410;
+      border-radius: 50%;
+      transform-origin: center center;
+      animation: blink 4.2s ease-in-out infinite;
+    }
+    #eye-l-g  { left: 20px;  }
+    #eye-r-g  { right: 20px; animation-delay: 0.07s; }
+    #eye-l-g::before, #eye-r-g::before {
+      content: '';
+      position: absolute;
+      top: 10%; left: 50%;
+      width: 5px; height: 5px;
+      background: #D4C5A9;
+      border-radius: 50%;
+    }
+
+    /* Happy squint — treat caught! */
+    @keyframes happySquint {
+      0%   { transform: scaleY(1);    }
+      15%  { transform: scaleY(0.08); }
+      65%  { transform: scaleY(0.1);  }
+      100% { transform: scaleY(1);    }
+    }
+    #eye-l-g.happy, #eye-r-g.happy {
+      animation: happySquint 0.95s ease-out forwards !important;
+    }
+
+    /* Extended happy — holds soft squint for full purr duration */
+    @keyframes catchAndPurr {
+      0%   { transform: scaleY(1);    }
+      6%   { transform: scaleY(0.08); }
+      78%  { transform: scaleY(0.2);  }
+      90%  { transform: scaleY(0.2);  }
+      100% { transform: scaleY(1);    }
+    }
+    #eye-l-g.eyes-purring, #eye-r-g.eyes-purring {
+      animation: catchAndPurr 4s ease-out forwards !important;
+    }
+
+    /* Purr micro-vibration on cat body */
+    @keyframes purrVibe {
+      0%   { transform: scaleX(1)     scaleY(1);     }
+      25%  { transform: scaleX(1.008) scaleY(0.994); }
+      75%  { transform: scaleX(0.993) scaleY(1.005); }
+      100% { transform: scaleX(1)     scaleY(1);     }
+    }
+    .css-cat.cat-purring {
+      animation: purrVibe 0.22s linear infinite;
+    }
+
+    /* Floating heart particles */
+    .heart-particle {
+      position: fixed;
+      pointer-events: none;
+      z-index: 500;
+      font-family: serif;
+      color: #1C1410;
+      transform: translate(-50%, -50%);
+    }
+
+    /* MUZZLE PATCH — 50% dither oval, lower face (contrast for nose/mouth) */
+    .cat-muzzle {
+      position: absolute;
+      bottom: 16px; left: 50%;
+      transform: translateX(-50%);
+      width: 54px; height: 38px;
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%23D4C5A9'/><rect x='0' y='0' width='2' height='2' fill='%231C1410'/><rect x='2' y='2' width='2' height='2' fill='%231C1410'/></svg>");
+      background-size: 4px 4px;
+      border-radius: 50%;
+    }
+
+    /* NOSE — solid ink */
+    .cat-nose {
+      position: absolute;
+      top: 62px; left: 50%;
+      transform: translateX(-50%);
+      width: 14px; height: 10px;
+      background: #1C1410;
+      clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    }
+
+    /* MOUTH */
+    .cat-mouth {
+      position: absolute;
+      top: 71px; left: 50%;
+      transform: translateX(-50%);
+      width: 20px; height: 9px;
+      border: 2.5px solid #1C1410;
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+    }
+
+    /* WHISKERS — paper color (visible against dark head) */
+    .cat-whisker {
+      position: absolute;
+      height: 1.5px; width: 62px;
+      background: #D4C5A9;
+      border-radius: 1px;
+      opacity: 0.9;
+    }
+    .cat-whisker--l1,
+    .cat-whisker--l2,
+    .cat-whisker--l3 { right: 59%; transform-origin: right center; top: 63px; }
+    .cat-whisker--r1,
+    .cat-whisker--r2,
+    .cat-whisker--r3 { left: 59%;  transform-origin: left center;  top: 63px; }
+
+    .cat-whisker--l1 { transform: rotate(-22deg); }
+    .cat-whisker--l2 { transform: rotate(-3deg);  }
+    .cat-whisker--l3 { transform: rotate(16deg);  }
+    .cat-whisker--r1 { transform: rotate(-22deg); }
+    .cat-whisker--r2 { transform: rotate(-3deg);  }
+    .cat-whisker--r3 { transform: rotate(16deg);  }
+
+    /* ---- TREAT BAG (fixed, top-right) ---- */
+    #treat-bag {
+      position: fixed;
+      top: 22px; right: 26px;
+      cursor: pointer;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      user-select: none;
+      transition: transform 0.12s;
+    }
+    #treat-bag:hover  { transform: scale(1.1) rotate(-5deg); }
+    #treat-bag:active { transform: scale(0.92); }
+
+    .bag-knot {
+      width: 14px; height: 8px;
+      background: #1C1410;
+      border-radius: 4px 4px 0 0;
+    }
+    .bag-body {
+      width: 40px; height: 50px;
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%231C1410'/><rect x='2' y='0' width='2' height='2' fill='%23D4C5A9'/></svg>");
+      background-size: 4px 4px;
+      border: 2.5px solid #1C1410;
+      border-radius: 3px 3px 10px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+    }
+    .bag-icon {
+      color: #D4C5A9;
+      font-size: 15px;
+      line-height: 1;
+    }
+    .bag-label-text {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 6px;
+      color: #D4C5A9;
+      letter-spacing: 0.12em;
+    }
+    .bag-hint {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.6rem;
+      color: #1C1410;
+      opacity: 0.6;
+      margin-top: 4px;
+      letter-spacing: 0.04em;
+    }
+
+    /* Flying treat dot */
+    .treat-flying {
+      position: fixed;
+      width: 10px; height: 10px;
+      background: #1C1410;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 1000;
+      transform: translate(-50%, -50%);
+    }
+  </style>
+</head>
+<body>
+
+<!-- TREAT BAG — fixed top-right corner -->
+<div id="treat-bag" onclick="throwTreat()">
+  <div class="bag-knot"></div>
+  <div class="bag-body">
+    <span class="bag-icon">★</span>
+    <span class="bag-label-text">TREATS</span>
+  </div>
+  <span class="bag-hint">[ treat ]</span>
+</div>
+
+<div class="stage">
+  <div class="bubble-area">
+    <div id="bubble" class="bubble">
+      <span id="bubble-text"></span>
+    </div>
+  </div>
+
+  <div class="cat-hover">
+    <div class="cat-float">
+      <div id="cat-squish" class="cat-squish" onclick="handleClick()">
+
+        <div class="css-cat">
+          <div class="cat-cloud"></div>
+
+          <div class="cat-tail">
+            <div id="tail-tip-g"></div>
+          </div>
+
+          <div class="cat-body">
+            <div class="cat-stripe cat-stripe--1"></div>
+            <div class="cat-stripe cat-stripe--2"></div>
+            <div class="cat-stripe cat-stripe--3"></div>
+            <div class="cat-stripe cat-stripe--4"></div>
+            <div class="cat-belly"></div>
+          </div>
+
+          <div class="cat-paw cat-paw--l"></div>
+          <div class="cat-paw cat-paw--r"></div>
+
+          <!-- Face group: ears + head animate together on treat catch -->
+          <div class="cat-face-group">
+            <div class="cat-ear cat-ear--l"><div class="cat-ear-inner"></div></div>
+            <div class="cat-ear cat-ear--r" id="ear-r-g"><div class="cat-ear-inner"></div></div>
+
+            <div class="cat-head">
+              <div class="cat-head-stripe cat-head-stripe--c"></div>
+              <div class="cat-head-stripe cat-head-stripe--l"></div>
+              <div class="cat-head-stripe cat-head-stripe--r"></div>
+              <div class="cat-blush cat-blush--l"></div>
+              <div class="cat-blush cat-blush--r"></div>
+              <!-- Eye bg rings (painted before eyes = behind eyes) -->
+              <div class="cat-eye-bg cat-eye-bg--l"></div>
+              <div class="cat-eye-bg cat-eye-bg--r"></div>
+              <div id="eye-l-g"></div>
+              <div id="eye-r-g"></div>
+              <!-- Muzzle patch behind nose/mouth -->
+              <div class="cat-muzzle"></div>
+              <div class="cat-nose"></div>
+              <div class="cat-mouth"></div>
+              <div class="cat-whisker cat-whisker--l1"></div>
+              <div class="cat-whisker cat-whisker--l2"></div>
+              <div class="cat-whisker cat-whisker--l3"></div>
+              <div class="cat-whisker cat-whisker--r1"></div>
+              <div class="cat-whisker cat-whisker--r2"></div>
+              <div class="cat-whisker cat-whisker--r3"></div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <p class="cat-label">[ pet the cat to receive love ]</p>
+</div>
+
+<script>
+  // ---- ADD OR EDIT AFFIRMATIONS HERE ----
+  const AFFIRMATIONS = [
+    "Your soul is immaculate",
+    "The boys and I agree: you are our favorite person",
+    "Sorry about your AIDS diagnosis (Angel In Da Sheets)",
+    "You are beloved.",
+    "I see how much you're going through and I want to share the weight",
+    "I would choose you again every time",
+    "We are going to get through this together",
+    "🎵 He ain't heavy, he's my man 🎵",
+    "I love you forever",
+    "I behold all of you in all your glory and cannot wait to behold more",
+    "Every day with you is worth it",
+    "You are allowed to rest",
+    "The life we're building together is worth every hard chapter",
+    "You don't have to be okay, if that makes sense",
+    "Somewhere a bass line is waiting for your guitar",
+    "\"You taught me to play. Now I play because of you. That's love made into sound.\" AI wrote this one.",
+    "I love playing music with you",
+    "My king!",
+    "I love hearing you play music",
+    "I love the way we see the world, when we converge and when we don't",
+    "You're the best physically, mentally, emotionally, sexually, philosophically, etc",
+    "Let's keep yapping forever",
+    "\"You are the most interesting conversation I've ever been in and it's been years\" This one's AI, but not bad actually.",
+    "Hours of talking with you and I always want more",
+    "I never run out of things I want to say to you or ask you or tell you",
+    "The boys are here. I'm here. You are surrounded on all sides by love.",
+    "\"Someone is probably sitting on something they shouldn't be, thinking of you\" This one is AI but vaguely menacing?",
+    "You are doing better than you think",
+    "Rest today",
+    "You are brave and I'm proud of you",
+    "I love you",
+    "You became the man that you are",
+    "You're hotter than two monkeys having sex",
+    "Yeah you got ADHD - A Damn Huge Dick",
+    "My rhythm, my rhyme, my reason for crime.",
+    "Grateful for you",
+  ];
+  // ----------------------------------------
+
+  let hideTimeout = null;
+  let isVisible   = false;
+  let queue       = [];   // shuffle-bag: depleted before refilling
+
+  function nextAffirmation() {
+    if (queue.length === 0) {
+      // refill with all indices, then Fisher-Yates shuffle
+      queue = AFFIRMATIONS.map((_, i) => i);
+      for (let i = queue.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [queue[i], queue[j]] = [queue[j], queue[i]];
+      }
+    }
+    return queue.pop();
+  }
+
+  function playMew() {
+    try {
+      const ctx    = new (window.AudioContext || window.webkitAudioContext)();
+      const osc    = ctx.createOscillator();
+      // Pre-filter tames the harshest highs before formant shaping
+      const precut = ctx.createBiquadFilter();
+      // Two formant filters: F1 (low vowel resonance) + F2 (high vowel resonance)
+      const f1     = ctx.createBiquadFilter();
+      const f2     = ctx.createBiquadFilter();
+      const gain   = ctx.createGain();
+      // Natural cat-voice wobble
+      const vib    = ctx.createOscillator();
+      const vibG   = ctx.createGain();
+
+      osc.type              = 'sawtooth';          // harmonics needed for formants to work
+      precut.type           = 'lowpass';
+      precut.frequency.value = 5000;               // cut only the very harsh top
+      f1.type = 'bandpass';  f1.Q.value = 10;      // narrow, resonant
+      f2.type = 'bandpass';  f2.Q.value = 8;
+      vib.type = 'sine';     vib.frequency.value = 7;
+      vibG.gain.value = 15;
+
+      vib.connect(vibG);
+      vibG.connect(osc.frequency);
+      osc.connect(precut);
+      precut.connect(f1);
+      precut.connect(f2);
+      f1.connect(gain);
+      f2.connect(gain);
+      gain.connect(ctx.destination);
+
+      const t = ctx.currentTime;
+
+      // Fundamental pitch arc: rise to "ee", brief hold, fall to "ow"
+      osc.frequency.setValueAtTime(390, t);
+      osc.frequency.linearRampToValueAtTime(640, t + 0.16);
+      osc.frequency.linearRampToValueAtTime(660, t + 0.28);
+      osc.frequency.exponentialRampToValueAtTime(330, t + 0.58);
+
+      // F1: "ee" resonance (~380 Hz) → "ow" resonance (~700 Hz)
+      f1.frequency.setValueAtTime(380, t);
+      f1.frequency.linearRampToValueAtTime(380, t + 0.24);
+      f1.frequency.linearRampToValueAtTime(700, t + 0.54);
+
+      // F2: "ee" resonance (~3200 Hz) → "ow" resonance (~1100 Hz)
+      f2.frequency.setValueAtTime(3200, t);
+      f2.frequency.linearRampToValueAtTime(3200, t + 0.24);
+      f2.frequency.linearRampToValueAtTime(1100, t + 0.54);
+
+      // Amplitude envelope
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.18, t + 0.07);
+      gain.gain.setValueAtTime(0.18, t + 0.38);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.62);
+
+      osc.start(t); vib.start(t);
+      osc.stop(t + 0.64); vib.stop(t + 0.64);
+      setTimeout(() => ctx.close(), 1100);
+    } catch(e) {}
+  }
+
+  function handleClick() {
+    playMew();
+
+    const el = document.getElementById('cat-squish');
+    el.classList.remove('squishing');
+    void el.offsetWidth;
+    el.classList.add('squishing');
+    el.addEventListener('animationend', () => el.classList.remove('squishing'), { once: true });
+
+    showBubble(AFFIRMATIONS[nextAffirmation()]);
+  }
+
+  function showBubble(text) {
+    const bubble = document.getElementById('bubble');
+    document.getElementById('bubble-text').textContent = text;
+    bubble.className = 'bubble';
+    void bubble.offsetWidth;
+    bubble.classList.add('show');
+    isVisible = true;
+    if (hideTimeout) clearTimeout(hideTimeout);
+    hideTimeout = setTimeout(hideBubble, 5500);
+  }
+
+  function hideBubble() {
+    const bubble = document.getElementById('bubble');
+    bubble.classList.remove('show');
+    bubble.classList.add('hide');
+    isVisible = false;
+    setTimeout(() => { bubble.className = 'bubble'; }, 220);
+  }
+
+  // ---- TREAT BAG ----
+  function throwTreat() {
+    const bag = document.getElementById('treat-bag');
+    if (bag.classList.contains('throwing')) return; // already in flight
+
+    bag.classList.add('throwing');
+
+    const bagRect   = bag.getBoundingClientRect();
+    const mouthEl   = document.querySelector('.cat-mouth');
+    const mouthRect = mouthEl.getBoundingClientRect();
+
+    const startX = bagRect.left  + bagRect.width  / 2;
+    const startY = bagRect.top   + bagRect.height / 2;
+    const dx     = (mouthRect.left + mouthRect.width  / 2) - startX;
+    const dy     = (mouthRect.top  + mouthRect.height / 2) - startY;
+
+    // Create the flying treat dot
+    const treat = document.createElement('div');
+    treat.className  = 'treat-flying';
+    treat.style.left = startX + 'px';
+    treat.style.top  = startY + 'px';
+    document.body.appendChild(treat);
+
+    // Parabolic arc: ease-out to peak, ease-in to mouth
+    const flight = treat.animate([
+      {
+        transform: 'translate(-50%, -50%) scale(1)',
+        opacity: 1,
+        easing: 'ease-out'
+      },
+      {
+        transform: `translate(calc(-50% + ${dx * 0.42}px), calc(-50% - 68px)) scale(1.35)`,
+        offset: 0.35,
+        opacity: 1,
+        easing: 'ease-in'
+      },
+      {
+        transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.65)`,
+        opacity: 0.85
+      }
+    ], { duration: 720, fill: 'forwards' });
+
+    // Mouth opens just before treat arrives
+    setTimeout(() => openMouthForCatch(), Math.round(720 * 0.68));
+
+    flight.finished.then(() => {
+      treat.remove();
+      bag.classList.remove('throwing');
+      startHappyState();
+    });
+  }
+
+  function openMouthForCatch() {
+    const mouthEl = document.querySelector('.cat-mouth');
+    mouthEl.classList.remove('open');
+    void mouthEl.offsetWidth;
+    mouthEl.classList.add('open');
+    mouthEl.addEventListener('animationend', () => mouthEl.classList.remove('open'), { once: true });
+  }
+
+  // ---- HAPPY / PURR STATE ----
+  let happyStateTimeout = null;
+
+  function startHappyState() {
+    // If already in happy state, restart it cleanly
+    if (happyStateTimeout) {
+      clearTimeout(happyStateTimeout);
+      endHappyState();
+    }
+
+    const catEl = document.querySelector('.css-cat');
+    const el    = document.getElementById('eye-l-g');
+    const er    = document.getElementById('eye-r-g');
+
+    // Eyes: soft squint held for 4s
+    el.classList.remove('happy', 'eyes-purring');
+    er.classList.remove('happy', 'eyes-purring');
+    void el.offsetWidth;
+    el.classList.add('eyes-purring');
+    er.classList.add('eyes-purring');
+
+    // Body: purr micro-vibration
+    catEl.classList.add('cat-purring');
+
+    // Hearts!
+    spawnHeartWaves(catEl.getBoundingClientRect());
+
+    // Sound
+    playPurr(3800);
+
+    happyStateTimeout = setTimeout(() => {
+      endHappyState();
+      happyStateTimeout = null;
+    }, 4000);
+  }
+
+  function endHappyState() {
+    document.querySelector('.css-cat').classList.remove('cat-purring');
+    document.getElementById('eye-l-g').classList.remove('eyes-purring');
+    document.getElementById('eye-r-g').classList.remove('eyes-purring');
+  }
+
+  function spawnHeartWaves(catRect) {
+    // 4 waves, gently tapering off
+    [
+      { delay: 0,    count: 8 },
+      { delay: 900,  count: 7 },
+      { delay: 1800, count: 5 },
+      { delay: 2700, count: 4 },
+    ].forEach(({ delay, count }) => {
+      setTimeout(() => {
+        for (let i = 0; i < count; i++) {
+          setTimeout(() => spawnOneHeart(catRect), i * 85);
+        }
+      }, delay);
+    });
+  }
+
+  function spawnOneHeart(catRect) {
+    const heart = document.createElement('div');
+    heart.className = 'heart-particle';
+    heart.textContent = Math.random() > 0.38 ? '♥' : '♡';
+
+    // Spawn from around the cat's upper body / head area
+    const cx = catRect.left + catRect.width  * 0.5;
+    const cy = catRect.top  + catRect.height * 0.38;
+    heart.style.left     = (cx + (Math.random() - 0.5) * catRect.width  * 0.75) + 'px';
+    heart.style.top      = (cy + (Math.random() - 0.5) * catRect.height * 0.38) + 'px';
+    heart.style.fontSize = (10 + Math.random() * 18) + 'px';
+    document.body.appendChild(heart);
+
+    const spread = (Math.random() - 0.5) * 170;
+    const rise   = 55 + Math.random() * 85;
+    const rot    = (Math.random() - 0.5) * 38;
+    const dur    = 950 + Math.random() * 650;
+
+    heart.animate([
+      { transform: 'translate(-50%,-50%) scale(0) rotate(0deg)',
+        opacity: 0,   easing: 'ease-out' },
+      { transform: `translate(-50%,-50%) scale(1.4) rotate(${rot * 0.3}deg)`,
+        opacity: 1,   offset: 0.18, easing: 'ease-in' },
+      { transform: `translate(calc(-50% + ${spread}px), calc(-50% - ${rise}px)) scale(0.7) rotate(${rot}deg)`,
+        opacity: 0 }
+    ], { duration: dur, fill: 'forwards' })
+    .finished.then(() => heart.remove());
+  }
+
+  function playPurr(duration) {
+    try {
+      const ctx      = new (window.AudioContext || window.webkitAudioContext)();
+      const osc      = ctx.createOscillator();
+      const filter   = ctx.createBiquadFilter();
+      const env      = ctx.createGain();
+      const lfo      = ctx.createOscillator();
+      const lfoGain  = ctx.createGain();
+
+      osc.type             = 'sawtooth';
+      osc.frequency.value  = 38;          // low rumble fundamental
+      filter.type          = 'lowpass';
+      filter.frequency.value = 380;       // keep it warm, cut harsh highs
+      filter.Q.value       = 1.0;
+      lfo.type             = 'sine';
+      lfo.frequency.value  = 26;          // purr rhythm ~26 Hz
+      lfoGain.gain.value   = 0.035;
+
+      osc.connect(filter);
+      filter.connect(env);
+      env.connect(ctx.destination);
+      lfo.connect(lfoGain);
+      lfoGain.connect(env.gain);
+
+      const t   = ctx.currentTime;
+      const dur = duration / 1000;
+      env.gain.setValueAtTime(0, t);
+      env.gain.linearRampToValueAtTime(0.08, t + 0.45);   // fade in
+      env.gain.setValueAtTime(0.08, t + dur - 0.55);
+      env.gain.linearRampToValueAtTime(0, t + dur);        // fade out
+
+      osc.start(t); lfo.start(t);
+      osc.stop(t + dur); lfo.stop(t + dur);
+      setTimeout(() => ctx.close(), duration + 600);
+    } catch(e) {}
+  }
+
+  document.addEventListener('click', e => {
+    if (isVisible &&
+        !e.target.closest('#cat-squish') &&
+        !e.target.closest('#bubble') &&
+        !e.target.closest('#treat-bag')) {
+      if (hideTimeout) clearTimeout(hideTimeout);
+      hideBubble();
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && isVisible) {
+      if (hideTimeout) clearTimeout(hideTimeout);
+      hideBubble();
+    }
+  });
+</script>
+</body>
+</html>
