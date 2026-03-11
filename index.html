@@ -138,6 +138,46 @@
       70%      { transform: rotate(-5deg); }
     }
 
+    /* ---- LASER REACTIONS ---- */
+
+    /* 1. Head tilt — set via JS inline transform on .cat-face-group */
+    .cat-face-group {
+      transition: transform 0.18s ease-out;
+    }
+
+    /* 2. Tail flick — speed up tailTipSway */
+    .tail-alert #tail-tip-g {
+      animation-duration: 0.55s !important;
+    }
+
+    /* 3. Butt wiggle */
+    @keyframes buttWiggle {
+      0%   { transform: translateX(0); }
+      20%  { transform: translateX(-5px); }
+      50%  { transform: translateX(5px); }
+      80%  { transform: translateX(-4px); }
+      100% { transform: translateX(0); }
+    }
+    .cat-squish.butt-wiggle {
+      animation: buttWiggle 0.38s ease-in-out infinite;
+    }
+
+    /* 4. Paw swipe — two variants for left/right */
+    @keyframes pawSwipeL {
+      0%   { transform: translateY(0)     rotate(0deg);   }
+      30%  { transform: translateY(-22px) rotate(-28deg); }
+      60%  { transform: translateY(-18px) rotate(-18deg); }
+      100% { transform: translateY(0)     rotate(0deg);   }
+    }
+    @keyframes pawSwipeR {
+      0%   { transform: translateY(0)    rotate(0deg);  }
+      30%  { transform: translateY(-22px) rotate(28deg); }
+      60%  { transform: translateY(-18px) rotate(18deg); }
+      100% { transform: translateY(0)    rotate(0deg);  }
+    }
+    .cat-paw--l.swiping { animation: pawSwipeL 0.35s cubic-bezier(0.34, 1.4, 0.64, 1); }
+    .cat-paw--r.swiping { animation: pawSwipeR 0.35s cubic-bezier(0.34, 1.4, 0.64, 1); }
+
     /* ---- LABEL ---- */
     .cat-label {
       font-family: 'Courier New', Courier, monospace;
@@ -1067,24 +1107,62 @@
   // ---- LASER POINTER ----
   let laserActive = false;
 
+  // Cat element refs for laser reactions
+  const catFaceGroup = document.querySelector('.cat-face-group');
+  const catSquish    = document.getElementById('cat-squish');
+  const cssCat       = document.querySelector('.css-cat');
+  const pawL         = document.querySelector('.cat-paw--l');
+  const pawR         = document.querySelector('.cat-paw--r');
+
+  function catCenterX() {
+    return cssCat.getBoundingClientRect().left + cssCat.getBoundingClientRect().width / 2;
+  }
+
+  function tiltHead(dotX) {
+    // Tilt toward dot: left = negative rotate, right = positive, capped at ±9deg
+    const dx    = dotX - catCenterX();
+    const tilt  = Math.max(-9, Math.min(9, dx * 0.04));
+    catFaceGroup.style.transform = `rotate(${tilt}deg)`;
+  }
+
+  function triggerPawSwipe(dotX) {
+    const paw = dotX < catCenterX() ? pawL : pawR;
+    if (paw.classList.contains('swiping')) return;
+    paw.classList.add('swiping');
+    paw.addEventListener('animationend', () => paw.classList.remove('swiping'), { once: true });
+  }
+
+  function startLaserReactions() {
+    cssCat.classList.add('tail-alert');
+    catSquish.classList.add('butt-wiggle');
+  }
+
+  function stopLaserReactions() {
+    cssCat.classList.remove('tail-alert');
+    catSquish.classList.remove('butt-wiggle');
+    catFaceGroup.style.transform = '';
+    pawL.classList.remove('swiping');
+    pawR.classList.remove('swiping');
+  }
+
   function startLaser() {
     const btn = document.getElementById('laser-btn');
     if (laserActive) return;
     laserActive = true;
     btn.classList.add('active');
+    startLaserReactions();
 
     // Create the dot
     const dot = document.createElement('div');
     dot.className = 'laser-dot';
     document.body.appendChild(dot);
 
-    // Start near the cat's feet area
+    // Floor zone: bottom 35% of screen, horizontal middle 80%
     const viewW = window.innerWidth;
     const viewH = window.innerHeight;
-    // Floor zone: bottom 35% of screen, horizontal middle 80%
-    const floorTop  = viewH * 0.62;
-    const floorBot  = viewH * 0.92;
-    const floorLeft = viewW * 0.10;
+    const floorTop   = viewH * 0.62;
+    const floorBot   = viewH * 0.92;
+    const floorLeft  = viewW * 0.10;
     const floorRight = viewW * 0.90;
 
     function randFloorX() { return floorLeft + Math.random() * (floorRight - floorLeft); }
@@ -1094,11 +1172,10 @@
     let y = randFloorY();
     dot.style.left = x + 'px';
     dot.style.top  = y + 'px';
+    tiltHead(x);
 
-    // Session: ~4.5s total, series of quick dashes with variable pauses
     const SESSION_MS = 4500;
     const start = performance.now();
-    let moveTimeout = null;
 
     function scheduleNextMove() {
       const elapsed = performance.now() - start;
@@ -1107,31 +1184,38 @@
         return;
       }
 
-      // Quick dash vs slow tease: 70% fast, 30% slow creep
       const fast = Math.random() < 0.70;
       const travelMs = fast
-        ? 80  + Math.random() * 140   // 80–220 ms dart
-        : 320 + Math.random() * 280;  // 320–600 ms creep
-      const pauseMs  = fast
-        ? 40  + Math.random() * 180   // brief pause after dart
-        : 200 + Math.random() * 300;  // longer pause after creep
+        ? 80  + Math.random() * 140
+        : 320 + Math.random() * 280;
+      const pauseMs = fast
+        ? 40  + Math.random() * 180
+        : 200 + Math.random() * 300;
 
       const tx = randFloorX();
       const ty = randFloorY();
 
-      // Animate dot position via CSS transition
       dot.style.transition = `left ${travelMs}ms linear, top ${travelMs}ms linear`;
       dot.style.left = tx + 'px';
       dot.style.top  = ty + 'px';
       x = tx; y = ty;
 
-      moveTimeout = setTimeout(scheduleNextMove, travelMs + pauseMs);
+      // Head follows dot
+      tiltHead(tx);
+
+      // Paw swipe only on fast darts, ~55% of the time
+      if (fast && Math.random() < 0.55) {
+        setTimeout(() => triggerPawSwipe(tx), travelMs * 0.6);
+      }
+
+      setTimeout(scheduleNextMove, travelMs + pauseMs);
     }
 
     scheduleNextMove();
   }
 
   function endLaser(dot, btn) {
+    stopLaserReactions();
     dot.style.transition = 'opacity 0.3s';
     dot.style.opacity = '0';
     setTimeout(() => {
