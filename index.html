@@ -561,6 +561,76 @@
       letter-spacing: 0.04em;
     }
 
+    /* ---- LASER POINTER ---- */
+    #laser-btn {
+      position: fixed;
+      top: 116px; right: 26px;
+      cursor: pointer;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      user-select: none;
+      transition: transform 0.12s;
+    }
+    #laser-btn:hover  { transform: scale(1.1) rotate(-5deg); }
+    #laser-btn:active { transform: scale(0.92); }
+    #laser-btn.active { opacity: 0.5; cursor: default; }
+
+    .laser-body {
+      position: relative;
+      width: 14px;
+      height: 48px;
+      background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%231C1410'/><rect x='2' y='0' width='2' height='2' fill='%23D4C5A9'/></svg>");
+      background-size: 4px 4px;
+      border: 2.5px solid #1C1410;
+      border-radius: 3px 3px 2px 2px;
+    }
+    /* button bump on top */
+    .laser-body::before {
+      content: '';
+      position: absolute;
+      top: 7px; left: 50%;
+      transform: translateX(-50%);
+      width: 8px; height: 5px;
+      background: #1C1410;
+      border-radius: 2px;
+    }
+    /* tip taper */
+    .laser-tip {
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 10px solid #1C1410;
+    }
+    /* red emitter dot on tip */
+    .laser-emitter {
+      width: 6px; height: 6px;
+      background: #c0392b;
+      border-radius: 50%;
+      margin-top: 3px;
+    }
+    .laser-hint {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.6rem;
+      color: #1C1410;
+      opacity: 0.6;
+      margin-top: 4px;
+      letter-spacing: 0.04em;
+    }
+
+    /* Red laser dot */
+    .laser-dot {
+      position: fixed;
+      width: 9px; height: 9px;
+      background: #e8150a;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 1000;
+      transform: translate(-50%, -50%);
+    }
+
     /* Flying treat dot */
     .treat-flying {
       position: fixed;
@@ -574,6 +644,14 @@
   </style>
 </head>
 <body>
+
+<!-- LASER POINTER — fixed top-right, below treat bag -->
+<div id="laser-btn" onclick="startLaser()">
+  <div class="laser-body"></div>
+  <div class="laser-tip"></div>
+  <div class="laser-emitter"></div>
+  <span class="laser-hint">[ play ]</span>
+</div>
 
 <!-- TREAT BAG — fixed top-right corner -->
 <div id="treat-bag" onclick="throwTreat()">
@@ -984,6 +1062,83 @@
       osc.stop(t + dur); lfo.stop(t + dur);
       setTimeout(() => ctx.close(), duration + 600);
     } catch(e) {}
+  }
+
+  // ---- LASER POINTER ----
+  let laserActive = false;
+
+  function startLaser() {
+    const btn = document.getElementById('laser-btn');
+    if (laserActive) return;
+    laserActive = true;
+    btn.classList.add('active');
+
+    // Create the dot
+    const dot = document.createElement('div');
+    dot.className = 'laser-dot';
+    document.body.appendChild(dot);
+
+    // Start near the cat's feet area
+    const viewW = window.innerWidth;
+    const viewH = window.innerHeight;
+    // Floor zone: bottom 35% of screen, horizontal middle 80%
+    const floorTop  = viewH * 0.62;
+    const floorBot  = viewH * 0.92;
+    const floorLeft = viewW * 0.10;
+    const floorRight = viewW * 0.90;
+
+    function randFloorX() { return floorLeft + Math.random() * (floorRight - floorLeft); }
+    function randFloorY() { return floorTop  + Math.random() * (floorBot  - floorTop);  }
+
+    let x = randFloorX();
+    let y = randFloorY();
+    dot.style.left = x + 'px';
+    dot.style.top  = y + 'px';
+
+    // Session: ~4.5s total, series of quick dashes with variable pauses
+    const SESSION_MS = 4500;
+    const start = performance.now();
+    let moveTimeout = null;
+
+    function scheduleNextMove() {
+      const elapsed = performance.now() - start;
+      if (elapsed >= SESSION_MS) {
+        endLaser(dot, btn);
+        return;
+      }
+
+      // Quick dash vs slow tease: 70% fast, 30% slow creep
+      const fast = Math.random() < 0.70;
+      const travelMs = fast
+        ? 80  + Math.random() * 140   // 80–220 ms dart
+        : 320 + Math.random() * 280;  // 320–600 ms creep
+      const pauseMs  = fast
+        ? 40  + Math.random() * 180   // brief pause after dart
+        : 200 + Math.random() * 300;  // longer pause after creep
+
+      const tx = randFloorX();
+      const ty = randFloorY();
+
+      // Animate dot position via CSS transition
+      dot.style.transition = `left ${travelMs}ms linear, top ${travelMs}ms linear`;
+      dot.style.left = tx + 'px';
+      dot.style.top  = ty + 'px';
+      x = tx; y = ty;
+
+      moveTimeout = setTimeout(scheduleNextMove, travelMs + pauseMs);
+    }
+
+    scheduleNextMove();
+  }
+
+  function endLaser(dot, btn) {
+    dot.style.transition = 'opacity 0.3s';
+    dot.style.opacity = '0';
+    setTimeout(() => {
+      dot.remove();
+      btn.classList.remove('active');
+      laserActive = false;
+    }, 300);
   }
 
   document.addEventListener('click', e => {
